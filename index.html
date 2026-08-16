@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Sleeping Brownies — Circle Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (free tier) powers the shared leaderboard. Your league's project
+     keys live in firebase-config.js, next to this file — see SETUP.md. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+  :root{
+    --field:#0F2E1D;
+    --field-line:#1B4430;
+    --chalk:#F2EFE6;
+    --chalk-dim:#B9C4B9;
+    --gold:#E8B923;
+    --compass:#4FA3B5;
+    --penalty:#C1443C;
+    --panel:#123524;
+    --panel-line:rgba(242,239,230,0.12);
+    --radius:14px;
+    --display: 'Bebas Neue', sans-serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(232,185,35,0.07), transparent 60%),
+      var(--field);
+    color:var(--chalk);
+    font-family:var(--body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:28px 18px 60px;}
+
+  /* ---- Header ---- */
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--field-line);
+    padding-bottom:16px;margin-bottom:18px;
+    gap:12px;flex-wrap:wrap;
+  }
+  .brand-eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    color:var(--gold);text-transform:uppercase;margin-bottom:2px;
+  }
+  h1{
+    font-family:var(--display);
+    font-size:44px;line-height:0.9;letter-spacing:.01em;
+    margin:0;color:var(--chalk);
+  }
+  h1 span{color:var(--gold);}
+  .who{text-align:right;font-family:var(--body);}
+  .who .name{font-weight:800;font-size:16px;color:var(--gold);}
+  .who button{
+    background:none;border:none;color:var(--chalk-dim);
+    font-family:var(--mono);font-size:11px;letter-spacing:.05em;
+    text-decoration:underline;cursor:pointer;padding:2px 0;margin-top:2px;
+  }
+  .who button:hover{color:var(--chalk);}
+  .who button:focus-visible, button:focus-visible, input:focus-visible{
+    outline:2px solid var(--compass);outline-offset:2px;
+  }
+
+  /* ---- Tabs ---- */
+  nav.tabs{
+    display:flex;gap:6px;margin-bottom:20px;
+    background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:999px;padding:5px;
+  }
+  nav.tabs button{
+    flex:1;padding:10px 8px;border:none;border-radius:999px;
+    background:transparent;color:var(--chalk-dim);
+    font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    cursor:pointer;transition:background .15s ease, color .15s ease;
+  }
+  nav.tabs button.active{background:var(--gold);color:#1a1300;font-weight:700;}
+  nav.tabs button:not(.active):hover{color:var(--chalk);}
+
+  .panel{
+    background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:var(--radius);padding:20px;
+  }
+  .hidden{display:none !important;}
+
+  /* ---- Round progress ---- */
+  .round-steps{display:flex;gap:8px;margin-bottom:16px;}
+  .round-steps .step{
+    flex:1;padding:8px 6px;border-radius:8px;text-align:center;
+    background:var(--field-line);border:1px solid var(--panel-line);
+    font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--chalk-dim);
+  }
+  .round-steps .step.current{background:var(--gold);color:#1a1300;font-weight:700;border-color:var(--gold);}
+  .round-steps .step.done{color:var(--chalk);border-color:var(--compass);}
+  .round-steps .step .tick{font-family:var(--body);}
+
+  .draw-instructions{font-size:14px;color:var(--chalk-dim);margin:0 0 6px;line-height:1.5;}
+  .size-target{
+    font-family:var(--mono);font-size:12px;color:var(--compass);margin:0 0 14px;
+  }
+
+  .canvas-shell{
+    position:relative;
+    width:100%;aspect-ratio:1/1;max-width:480px;margin:0 auto;
+    background:radial-gradient(circle at 50% 50%, rgba(242,239,230,0.02), transparent 70%), var(--field);
+    border:1.5px dashed var(--panel-line);
+    border-radius:50%;
+    touch-action:none;
+    cursor:crosshair;
+  }
+  canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;}
+
+  .band-legend{
+    display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
+    margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:.03em;
+  }
+  .band-legend .chip{
+    display:flex;align-items:center;gap:6px;color:var(--chalk-dim);opacity:.5;
+    transition:opacity .15s ease;
+  }
+  .band-legend .chip.active{opacity:1;color:var(--chalk);font-weight:700;}
+  .band-legend .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+  .draw-actions{display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap;}
+  .btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:.04em;text-transform:uppercase;
+    padding:12px 20px;border-radius:8px;border:1px solid var(--panel-line);
+    background:var(--field-line);color:var(--chalk);cursor:pointer;
+    transition:transform .1s ease, background .15s ease;
+  }
+  .btn:hover{background:#204f37;}
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--gold);color:#1a1300;border-color:var(--gold);font-weight:700;}
+  .btn-primary:hover{background:#f5c745;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .hint{text-align:center;font-family:var(--mono);font-size:12px;color:var(--chalk-dim);margin-top:10px;min-height:16px;}
+  .hint.error{color:var(--penalty);}
+
+  /* ---- Round / final result ---- */
+  .result{
+    margin-top:20px;padding-top:18px;border-top:1px solid var(--panel-line);
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center;
+  }
+  .score-ring{position:relative;width:110px;height:110px;flex-shrink:0;}
+  .score-ring svg{transform:rotate(-90deg);}
+  .score-ring .num{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--display);font-size:32px;color:var(--chalk);
+  }
+  .result-copy{flex:1;min-width:180px;}
+  .result-copy .verdict{font-family:var(--display);font-size:22px;color:var(--gold);margin:0 0 4px;letter-spacing:.02em;}
+  .result-copy p{margin:0;color:var(--chalk-dim);font-size:13px;line-height:1.5;}
+  .save-status{font-family:var(--mono);font-size:11px;color:var(--compass);margin-top:6px;}
+
+  .breakdown{width:100%;margin-top:16px;border-top:1px solid var(--panel-line);padding-top:14px;}
+  .breakdown-row{
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--mono);font-size:12px;padding:6px 0;color:var(--chalk-dim);
+  }
+  .breakdown-row .label{color:var(--chalk);text-transform:uppercase;letter-spacing:.04em;}
+  .breakdown-row .val{color:var(--gold);font-weight:700;}
+  .breakdown-row.total{border-top:1px solid var(--panel-line);margin-top:4px;padding-top:10px;}
+  .breakdown-row.total .val{font-size:15px;}
+
+  /* ---- Leaderboard ---- */
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  thead th{
+    text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--chalk-dim);padding:0 10px 10px;
+    border-bottom:1px solid var(--panel-line);
+  }
+  thead th.num,td.num{text-align:right;}
+  tbody td{padding:12px 10px;border-bottom:1px solid rgba(242,239,230,0.06);}
+  tbody tr.me{background:rgba(232,185,35,0.08);}
+  tbody tr.me td:first-child{border-left:2px solid var(--gold);padding-left:8px;}
+  .rank{font-family:var(--mono);color:var(--chalk-dim);}
+  .rank.gold{color:var(--gold);font-weight:700;}
+  .pname{font-weight:600;}
+  .score-cell{font-family:var(--mono);font-weight:700;color:var(--chalk);}
+  .empty-state{text-align:center;padding:30px 10px;color:var(--chalk-dim);font-size:13px;}
+  .empty-state .big{font-family:var(--display);font-size:20px;color:var(--chalk);display:block;margin-bottom:6px;}
+  .lb-note{font-family:var(--mono);font-size:11px;color:var(--chalk-dim);margin-top:14px;line-height:1.6;}
+
+  /* ---- Stats ---- */
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+  .stat-box{background:var(--field-line);border-radius:10px;padding:14px 10px;text-align:center;}
+  .stat-box .v{font-family:var(--display);font-size:28px;color:var(--gold);}
+  .stat-box .l{font-family:var(--mono);font-size:10px;color:var(--chalk-dim);letter-spacing:.05em;text-transform:uppercase;margin-top:2px;}
+  .history-title{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--chalk-dim);margin:0 0 10px;}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:80px;}
+  .bars .bar{flex:1;background:var(--compass);border-radius:3px 3px 0 0;min-height:3px;position:relative;}
+  .bars .bar.best{background:var(--gold);}
+  .bars .bar span{
+    position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:9px;color:var(--chalk-dim);margin-bottom:3px;white-space:nowrap;
+  }
+
+  /* ---- Name modal ---- */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(4,14,8,0.82);
+    display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;
+  }
+  .modal{
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:var(--radius);
+    padding:28px 24px;max-width:360px;width:100%;text-align:center;
+  }
+  .modal .compass-icon{width:44px;height:44px;margin:0 auto 14px;color:var(--gold);}
+  .modal h2{font-family:var(--display);font-size:26px;margin:0 0 6px;letter-spacing:.02em;}
+  .modal p{color:var(--chalk-dim);font-size:13px;margin:0 0 18px;line-height:1.5;}
+  .modal input{
+    width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--panel-line);
+    background:var(--field);color:var(--chalk);font-family:var(--body);font-size:15px;margin-bottom:12px;
+  }
+  .modal input::placeholder{color:var(--chalk-dim);}
+
+  footer{margin-top:26px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--chalk-dim);opacity:.6;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="hint error" id="configWarning" style="display:none;text-align:left;background:rgba(193,68,60,0.15);border:1px solid var(--penalty);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+    Firebase isn't configured yet, so scores won't save. Edit <strong>firebase-config.js</strong> with your project's keys — see SETUP.md.
+  </div>
+  <header>
+    <div>
+      <div class="brand-eyebrow">Circle Draft Challenge</div>
+      <h1>SLEEPING <span>BROWNIES</span></h1>
+    </div>
+    <div class="who">
+      <div class="name" id="whoName">—</div>
+      <button id="switchBtn" type="button">switch player</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="draw">Draw</button>
+    <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
+    <button class="tab-btn" data-tab="stats">My Stats</button>
+  </nav>
+
+  <!-- DRAW TAB -->
+  <section class="panel" id="tab-draw">
+    <div class="round-steps" id="roundSteps"></div>
+
+    <p class="draw-instructions" id="drawInstructions">Trace one full loop back to your starting point.</p>
+    <p class="size-target" id="sizeTarget">—</p>
+
+    <!-- per-round result: sits right under the target so the roast is the first thing you see -->
+    <div class="result hidden" id="roundResult">
+      <div class="score-ring">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="48" fill="none" stroke="rgba(242,239,230,0.1)" stroke-width="8"/>
+          <circle id="roundArc" cx="55" cy="55" r="48" fill="none" stroke="var(--gold)" stroke-width="8" stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
+        </svg>
+        <div class="num" id="roundScoreNum">0</div>
+      </div>
+      <div class="result-copy">
+        <p class="verdict" id="roundVerdict">—</p>
+        <p id="roundVerdictSub">—</p>
+      </div>
+    </div>
+
+    <!-- final composite result: same placement, shown after round 3 -->
+    <div class="result hidden" id="finalResult">
+      <div class="score-ring">
+        <svg width="110" height="110" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="48" fill="none" stroke="rgba(242,239,230,0.1)" stroke-width="8"/>
+          <circle id="finalArc" cx="55" cy="55" r="48" fill="none" stroke="var(--gold)" stroke-width="8" stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/>
+        </svg>
+        <div class="num" id="finalScoreNum">0</div>
+      </div>
+      <div class="result-copy">
+        <p class="verdict" id="finalVerdict">Try complete</p>
+        <p id="finalVerdictSub">Composite score across all three rounds.</p>
+        <div class="save-status" id="saveStatus"></div>
+      </div>
+      <div class="breakdown" id="breakdown"></div>
+    </div>
+
+    <div class="canvas-shell" id="canvasShell">
+      <canvas id="drawCanvas"></canvas>
+    </div>
+    <div class="band-legend" id="bandLegend"></div>
+    <div class="hint" id="drawHint">&nbsp;</div>
+    <div class="draw-actions">
+      <button class="btn" id="clearBtn">Clear</button>
+      <button class="btn btn-primary hidden" id="continueBtn">Continue</button>
+      <button class="btn btn-primary hidden" id="newTryBtn">Start new try</button>
+    </div>
+  </section>
+
+  <!-- LEADERBOARD TAB -->
+  <section class="panel hidden" id="tab-leaderboard">
+    <table>
+      <thead>
+        <tr><th>Rank</th><th>Player</th><th class="num">Best</th><th class="num">Avg</th><th class="num">Tries</th></tr>
+      </thead>
+      <tbody id="leaderboardBody"></tbody>
+    </table>
+    <div class="empty-state hidden" id="lbEmpty">
+      <span class="big">No circles on the board yet</span>
+      Be the first — head to the Draw tab.
+    </div>
+    <div class="lb-note">Scores are the weighted composite of one small, one medium and one large circle — small counts for 17%, medium 33%, large 50% (bigger circles are harder to keep round, so they count for more). Ranked by best try. Commissioner's call on whether top score picks first or last.</div>
+  </section>
+
+  <!-- STATS TAB -->
+  <section class="panel hidden" id="tab-stats">
+    <div class="stat-grid">
+      <div class="stat-box"><div class="v" id="statBest">–</div><div class="l">Best score</div></div>
+      <div class="stat-box"><div class="v" id="statAvg">–</div><div class="l">Average</div></div>
+      <div class="stat-box"><div class="v" id="statCount">–</div><div class="l">Tries</div></div>
+    </div>
+    <p class="history-title">Recent tries (composite)</p>
+    <div class="bars" id="statBars"></div>
+    <div class="empty-state hidden" id="statsEmpty">
+      <span class="big">No tries yet</span>
+      Draw your first set of three circles to start your file.
+    </div>
+  </section>
+
+  <footer>SCORED BY LEAST-SQUARES CIRCLE FIT · RADIAL DEVIATION + CLOSURE + SWEEP COMPLETENESS<br>COMPOSITE = (SMALL×1 + MEDIUM×2 + LARGE×3) / 6</footer>
+</div>
+
+<!-- NAME MODAL -->
+<div class="modal-backdrop" id="nameModal">
+  <div class="modal">
+    <svg class="compass-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+    </svg>
+    <h2 id="modalTitle">Who's drawing?</h2>
+    <p>Enter the name that should show up on the leaderboard. You can switch players any time from the header.</p>
+    <input type="text" id="nameInput" placeholder="Your name" maxlength="30" autocomplete="off">
+    <button class="btn btn-primary" id="nameSubmit" style="width:100%;">Start drawing</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Storage helpers ----------
+  // Same signature as the Claude-artifact version — safeGet/safeSet/safeList(key, shared) —
+  // so the rest of the app (scoring, rounds, UI) is untouched.
+  // shared=true  -> Firebase Firestore (visible to every player, no login required)
+  // shared=false -> localStorage (this browser only, e.g. "remember my name")
+  let db = null;
+  try{
+    if(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY_HERE'){
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+      db = firebase.firestore();
+    } else {
+      const warn = document.getElementById('configWarning');
+      if(warn) warn.style.display = 'block';
+    }
+  } catch(e){
+    console.error('Firebase init failed:', e);
+    const warn = document.getElementById('configWarning');
+    if(warn) warn.style.display = 'block';
+  }
+
+  const COLLECTION = 'circleDraft';
+
+  async function safeGet(key, shared){
+    try{
+      if(shared){
+        if(!db) return null;
+        const doc = await db.collection(COLLECTION).doc(key).get();
+        return doc.exists ? { key, value: doc.data().value } : null;
+      } else {
+        const v = localStorage.getItem(key);
+        return v !== null ? { key, value: v } : null;
+      }
+    } catch(e){ console.error('storage get failed:', e); return null; }
+  }
+
+  async function safeSet(key, value, shared){
+    try{
+      if(shared){
+        if(!db) return null;
+        await db.collection(COLLECTION).doc(key).set({
+          value,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        return { key, value };
+      } else {
+        localStorage.setItem(key, value);
+        return { key, value };
+      }
+    } catch(e){ console.error('storage set failed:', e); return null; }
+  }
+
+  async function safeList(prefix, shared){
+    try{
+      if(shared){
+        if(!db) return null;
+        // Prefix-range trick on the document ID (Firestore has no native "starts with" query).
+        const snap = await db.collection(COLLECTION)
+          .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
+          .where(firebase.firestore.FieldPath.documentId(), '<', prefix + '\uf8ff')
+          .get();
+        return { keys: snap.docs.map(d => d.id) };
+      } else {
+        const keys = [];
+        for(let i=0;i<localStorage.length;i++){
+          const k = localStorage.key(i);
+          if(k && k.startsWith(prefix)) keys.push(k);
+        }
+        return { keys };
+      }
+    } catch(e){ console.error('storage list failed:', e); return null; }
+  }
+  function slugify(name){
+    return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'player';
+  }
+  function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // ---------- Round definitions ----------
+  // minFrac/maxFrac are the drawn radius as a fraction of the pad's half-width.
+  // weight: bigger circles are harder to keep round, so they count for more.
+  const ROUNDS = [
+    { key:'small',  label:'Small',  weight:1, minFrac:0.14, maxFrac:0.28, target:'target: fill about a quarter of the pad', color:'#4FA3B5' },
+    { key:'medium', label:'Medium', weight:2, minFrac:0.34, maxFrac:0.54, target:'target: fill about half of the pad', color:'#E8B923' },
+    { key:'large',  label:'Large',  weight:3, minFrac:0.62, maxFrac:0.88, target:'target: fill most of the pad', color:'#9B7FD4' },
+  ];
+  const WEIGHT_SUM = ROUNDS.reduce((s,r)=>s+r.weight,0);
+
+  function hexToRgba(hex, alpha){
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16);
+    const g = parseInt(h.substring(2,4),16);
+    const b = parseInt(h.substring(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  // ---------- State ----------
+  let currentPlayer = null;
+  let drawing = false;
+  let points = [];
+  let roundIndex = 0;
+  let roundScores = {}; // key -> score
+
+  // ---------- DOM refs ----------
+  const nameModal = document.getElementById('nameModal');
+  const nameInput = document.getElementById('nameInput');
+  const nameSubmit = document.getElementById('nameSubmit');
+  const modalTitle = document.getElementById('modalTitle');
+  const whoName = document.getElementById('whoName');
+  const switchBtn = document.getElementById('switchBtn');
+
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabs = {
+    draw: document.getElementById('tab-draw'),
+    leaderboard: document.getElementById('tab-leaderboard'),
+    stats: document.getElementById('tab-stats'),
+  };
+
+  const roundSteps = document.getElementById('roundSteps');
+  const drawInstructions = document.getElementById('drawInstructions');
+  const sizeTarget = document.getElementById('sizeTarget');
+  const shell = document.getElementById('canvasShell');
+  const bandLegend = document.getElementById('bandLegend');
+  const canvas = document.getElementById('drawCanvas');
+  const ctx = canvas.getContext('2d');
+  const drawHint = document.getElementById('drawHint');
+  const clearBtn = document.getElementById('clearBtn');
+  const continueBtn = document.getElementById('continueBtn');
+  const newTryBtn = document.getElementById('newTryBtn');
+
+  const roundResult = document.getElementById('roundResult');
+  const roundArc = document.getElementById('roundArc');
+  const roundScoreNum = document.getElementById('roundScoreNum');
+  const roundVerdict = document.getElementById('roundVerdict');
+  const roundVerdictSub = document.getElementById('roundVerdictSub');
+
+  const finalResult = document.getElementById('finalResult');
+  const finalArc = document.getElementById('finalArc');
+  const finalScoreNum = document.getElementById('finalScoreNum');
+  const finalVerdictSub = document.getElementById('finalVerdictSub');
+  const saveStatus = document.getElementById('saveStatus');
+  const breakdown = document.getElementById('breakdown');
+
+  const leaderboardBody = document.getElementById('leaderboardBody');
+  const lbEmpty = document.getElementById('lbEmpty');
+
+  const statBest = document.getElementById('statBest');
+  const statAvg = document.getElementById('statAvg');
+  const statCount = document.getElementById('statCount');
+  const statBars = document.getElementById('statBars');
+  const statsEmpty = document.getElementById('statsEmpty');
+
+  const ARC_CIRC = 2 * Math.PI * 48;
+
+  // ---------- Canvas sizing ----------
+  function sizeCanvas(){
+    const rect = shell.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    redraw();
+  }
+  window.addEventListener('resize', sizeCanvas);
+
+  function drawBands(rect){
+    const cx = rect.width/2, cy = rect.height/2;
+    const half = Math.min(rect.width, rect.height)/2;
+    ROUNDS.forEach((r,i) => {
+      const rMin = r.minFrac*half;
+      const rMax = r.maxFrac*half;
+      const isActive = i===roundIndex;
+      ctx.beginPath();
+      ctx.arc(cx,cy,rMax,0,Math.PI*2);
+      ctx.arc(cx,cy,rMin,0,Math.PI*2,true);
+      ctx.fillStyle = hexToRgba(r.color, isActive ? 0.22 : 0.06);
+      ctx.fill('evenodd');
+      if(isActive){
+        ctx.beginPath(); ctx.arc(cx,cy,rMax,0,Math.PI*2);
+        ctx.strokeStyle = hexToRgba(r.color, 0.6);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx,cy,rMin,0,Math.PI*2);
+        ctx.stroke();
+      }
+    });
+  }
+
+  function redraw(){
+    const rect = shell.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
+    drawBands(rect);
+    if(points.length > 1){
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim();
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    // The shaded bands mark size targets only — no ideal/fitted circle is
+    // ever drawn, so roundness scoring stays blind to your own attempt.
+  }
+
+  function localPoint(evt){
+    const rect = shell.getBoundingClientRect();
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function inputLocked(){
+    return !roundResult.classList.contains('hidden') || !finalResult.classList.contains('hidden');
+  }
+
+  function startDraw(evt){
+    if(inputLocked()) return;
+    drawing = true;
+    points = [localPoint(evt)];
+    redraw();
+    evt.preventDefault();
+  }
+  function moveDraw(evt){
+    if(!drawing) return;
+    const p = localPoint(evt);
+    const last = points[points.length-1];
+    if(Math.hypot(p.x-last.x, p.y-last.y) > 2){
+      points.push(p);
+      redraw();
+    }
+    evt.preventDefault();
+  }
+  function endDraw(evt){
+    if(!drawing) return;
+    drawing = false;
+    finishRound();
+    if(evt) evt.preventDefault();
+  }
+
+  shell.addEventListener('pointerdown', startDraw);
+  shell.addEventListener('pointermove', moveDraw);
+  window.addEventListener('pointerup', endDraw);
+  shell.addEventListener('pointercancel', endDraw);
+
+  // ---------- Circle fit + scoring ----------
+  // Kåsa least-squares circle fit: minimizes sum of squared radial residuals.
+  function fitCircleKasa(pts){
+    const n = pts.length;
+    let xm=0, ym=0;
+    for(const p of pts){ xm+=p.x; ym+=p.y; }
+    xm/=n; ym/=n;
+
+    let Suu=0,Svv=0,Suv=0,Suuu=0,Svvv=0,Suvv=0,Svuu=0;
+    for(const p of pts){
+      const u = p.x-xm, v = p.y-ym;
+      Suu += u*u; Svv += v*v; Suv += u*v;
+      Suuu += u*u*u; Svvv += v*v*v;
+      Suvv += u*v*v; Svuu += v*u*u;
+    }
+    const det = Suu*Svv - Suv*Suv;
+    let uc, vc;
+    if(Math.abs(det) < 1e-9){
+      uc = 0; vc = 0; // degenerate (near-collinear) — fall back to centroid
+    } else {
+      const A = 0.5*(Suuu+Suvv);
+      const B = 0.5*(Svvv+Svuu);
+      uc = (Svv*A - Suv*B) / det;
+      vc = (Suu*B - Suv*A) / det;
+    }
+    const cx = xm+uc, cy = ym+vc;
+    const R = Math.sqrt(uc*uc + vc*vc + (Suu+Svv)/n);
+    return { cx, cy, R };
+  }
+
+  function scoreCircle(pts){
+    if(pts.length < 20){
+      return { error: "Too short — trace a full loop, don't just tap." };
+    }
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(const p of pts){
+      if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+      if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+    }
+    const diag = Math.hypot(maxX-minX, maxY-minY);
+    if(diag < 40){
+      return { error: "Too small to measure — use more of the pad." };
+    }
+
+    const fit = fitCircleKasa(pts);
+    const R = fit.R;
+    if(!isFinite(R) || R <= 0){
+      return { error: "Couldn't read that shape — try a rounder loop." };
+    }
+
+    // 1) Radial consistency: how much each point wobbles off the fitted radius.
+    let sqErr = 0;
+    for(const p of pts){
+      const d = Math.hypot(p.x-fit.cx, p.y-fit.cy);
+      const e = d - R;
+      sqErr += e*e;
+    }
+    const rmse = Math.sqrt(sqErr/pts.length);
+    const cv = rmse / R; // coefficient of variation — size-independent wobble measure
+    const c0 = 0.08;
+    const radiusScore = 100 / (1 + Math.pow(cv/c0, 2));
+
+    // 2) Closure: how close the loop's end is to its start, relative to radius.
+    const first = pts[0], last = pts[pts.length-1];
+    const closureDist = Math.hypot(last.x-first.x, last.y-first.y);
+    const closureFactor = Math.max(0, 1 - closureDist/(0.6*R));
+
+    // 3) Completeness: did the stroke sweep one full 360° around the center
+    //    (catches partial arcs and doubled-back loops)?
+    let totalAngle = 0;
+    let prevAngle = Math.atan2(pts[0].y-fit.cy, pts[0].x-fit.cx);
+    for(let i=1;i<pts.length;i++){
+      const a = Math.atan2(pts[i].y-fit.cy, pts[i].x-fit.cx);
+      let diff = a - prevAngle;
+      while(diff > Math.PI) diff -= 2*Math.PI;
+      while(diff < -Math.PI) diff += 2*Math.PI;
+      totalAngle += diff;
+      prevAngle = a;
+    }
+    const sweep = Math.abs(totalAngle);
+    const completeness = Math.max(0, 1 - Math.abs(sweep - 2*Math.PI)/(2*Math.PI));
+
+    const finalScore = Math.max(0, Math.min(100, Math.round(radiusScore * closureFactor * completeness)));
+
+    // Radius as a fraction of the pad's half-width, for range validation.
+    const rect = shell.getBoundingClientRect();
+    const half = Math.min(rect.width, rect.height) / 2;
+    const radiusFrac = R / half;
+
+    return { score: finalScore, radiusFrac };
+  }
+
+  const ROAST = {
+    elite: [
+      "Okay, geometry genius. Put the compass down.",
+      "That's suspiciously round. We're watching you.",
+      "10/10, no notes, mildly concerning precision.",
+      "The protractor called — it's jealous.",
+    ],
+    great: [
+      "Respectable. A little wobble, nothing a paper towel roll couldn't hide.",
+      "Solid. Not framed-in-the-league-chat solid, but solid.",
+      "Circle-ish and proud. We'll allow it.",
+      "You've clearly done this before. Suspicious, but fine.",
+    ],
+    mid: [
+      "It's... a shape. A shape that's heard of circles.",
+      "Somewhere between 'circle' and 'guacamole.'",
+      "Wobbly but well-intentioned. Like your draft strategy.",
+      "Mid. Deeply, aggressively mid.",
+    ],
+    rough: [
+      "That's less a circle, more a crime scene outline.",
+      "Did your mouse have a seizure?",
+      "I've seen steadier hands on a rollercoaster.",
+      "Bold interpretation of 'round.'",
+    ],
+    bad: [
+      "That's not a circle, that's abstract art. Sell it, don't score it.",
+      "Somewhere, a geometry teacher just felt a disturbance.",
+      "A toddler with a crayon called — they want credit.",
+      "The shape equivalent of drafting a kicker in round 2.",
+    ],
+  };
+  function pickRoast(score){
+    let tier;
+    if(score>=90) tier='elite';
+    else if(score>=75) tier='great';
+    else if(score>=55) tier='mid';
+    else if(score>=35) tier='rough';
+    else tier='bad';
+    const arr = ROAST[tier];
+    return arr[Math.floor(Math.random()*arr.length)];
+  }
+
+  // ---------- Round flow ----------
+  function renderSteps(){
+    roundSteps.innerHTML = '';
+    ROUNDS.forEach((r,i) => {
+      const el = document.createElement('div');
+      el.className = 'step' + (i===roundIndex ? ' current' : (roundScores[r.key]!==undefined ? ' done' : ''));
+      const mark = roundScores[r.key]!==undefined ? ` <span class="tick">${roundScores[r.key]}</span>` : '';
+      el.innerHTML = `${r.label}${mark}`;
+      roundSteps.appendChild(el);
+    });
+  }
+
+  function renderLegend(){
+    bandLegend.innerHTML = ROUNDS.map((r,i) => `
+      <span class="chip${i===roundIndex ? ' active' : ''}">
+        <span class="dot" style="background:${r.color}"></span>${r.label}
+      </span>
+    `).join('');
+  }
+
+  function setupRoundUI(){
+    const r = ROUNDS[roundIndex];
+    renderSteps();
+    renderLegend();
+    drawInstructions.textContent = `Round ${roundIndex+1} of 3 — draw a ${r.label.toLowerCase()} circle, one full loop back to your start.`;
+    sizeTarget.textContent = r.target;
+    resetCanvasArea();
+  }
+
+  function resetCanvasArea(){
+    points = [];
+    redraw();
+    roundResult.classList.add('hidden');
+    finalResult.classList.add('hidden');
+    continueBtn.classList.add('hidden');
+    newTryBtn.classList.add('hidden');
+    clearBtn.classList.remove('hidden');
+    drawHint.textContent = '';
+    drawHint.classList.remove('error');
+  }
+
+  clearBtn.addEventListener('click', resetCanvasArea);
+
+  function finishRound(){
+    const r = ROUNDS[roundIndex];
+    const result = scoreCircle(points);
+    if(result.error){
+      drawHint.textContent = result.error;
+      drawHint.classList.add('error');
+      points = [];
+      redraw();
+      return;
+    }
+    if(result.radiusFrac < r.minFrac){
+      drawHint.textContent = `Too small for the ${r.label} round — ${r.target}.`;
+      drawHint.classList.add('error');
+      points = [];
+      redraw();
+      return;
+    }
+    if(result.radiusFrac > r.maxFrac){
+      drawHint.textContent = `Too big for the ${r.label} round — ${r.target}.`;
+      drawHint.classList.add('error');
+      points = [];
+      redraw();
+      return;
+    }
+
+    drawHint.textContent = '';
+    drawHint.classList.remove('error');
+    roundScores[r.key] = result.score;
+    renderSteps();
+    showRoundResult(result.score, roundIndex === ROUNDS.length-1);
+  }
+
+  function showRoundResult(score, isLast){
+    roundResult.classList.remove('hidden');
+    clearBtn.classList.add('hidden');
+    const offset = ARC_CIRC - (ARC_CIRC * score/100);
+    roundArc.style.transition = 'stroke-dashoffset 0.7s ease';
+    requestAnimationFrame(()=>{ roundArc.style.strokeDashoffset = offset; });
+    roundScoreNum.textContent = score;
+    roundArc.setAttribute('stroke', score>=70 ? 'var(--gold)' : (score>=40 ? 'var(--compass)' : 'var(--penalty)'));
+    roundVerdict.textContent = `${ROUNDS[roundIndex].label}: ${score}/100`;
+    roundVerdictSub.textContent = pickRoast(score);
+
+    if(isLast){
+      continueBtn.classList.add('hidden');
+      finishTry();
+    } else {
+      continueBtn.classList.remove('hidden');
+      continueBtn.textContent = `Continue to ${ROUNDS[roundIndex+1].label}`;
+    }
+  }
+
+  continueBtn.addEventListener('click', () => {
+    roundIndex += 1;
+    roundResult.classList.add('hidden');
+    setupRoundUI();
+  });
+
+  async function finishTry(){
+    const composite = Math.round(
+      ROUNDS.reduce((sum,r)=> sum + roundScores[r.key]*r.weight, 0) / WEIGHT_SUM
+    );
+
+    roundResult.classList.add('hidden');
+    finalResult.classList.remove('hidden');
+    newTryBtn.classList.remove('hidden');
+
+    const offset = ARC_CIRC - (ARC_CIRC * composite/100);
+    finalArc.style.transition = 'stroke-dashoffset 0.7s ease';
+    requestAnimationFrame(()=>{ finalArc.style.strokeDashoffset = offset; });
+    finalScoreNum.textContent = composite;
+    finalArc.setAttribute('stroke', composite>=70 ? 'var(--gold)' : (composite>=40 ? 'var(--compass)' : 'var(--penalty)'));
+    finalVerdictSub.textContent = pickRoast(composite);
+
+    breakdown.innerHTML = ROUNDS.map(r => `
+      <div class="breakdown-row">
+        <span class="label">${r.label} &times;${r.weight} (${Math.round(r.weight/WEIGHT_SUM*100)}%)</span>
+        <span class="val">${roundScores[r.key]}</span>
+      </div>
+    `).join('') + `
+      <div class="breakdown-row total">
+        <span class="label">Composite</span>
+        <span class="val">${composite}</span>
+      </div>
+    `;
+
+    saveStatus.textContent = 'Saving to leaderboard…';
+    const ok = await saveAttempt(composite, roundScores);
+    saveStatus.textContent = ok ? 'Saved to the league leaderboard.' : 'Could not save — check your connection and try again.';
+  }
+
+  newTryBtn.addEventListener('click', () => {
+    roundIndex = 0;
+    roundScores = {};
+    setupRoundUI();
+  });
+
+  // ---------- Player identity ----------
+  async function saveAttempt(score, subScores){
+    if(!currentPlayer) return false;
+    const key = `player:${slugify(currentPlayer)}`;
+    let record;
+    const existing = await safeGet(key, true);
+    if(existing){
+      try{ record = JSON.parse(existing.value); } catch(e){ record = null; }
+    }
+    if(!record){
+      record = { displayName: currentPlayer, attempts: [], bestScore: 0, avgScore: 0 };
+    }
+    record.displayName = currentPlayer;
+    record.attempts.push({ score, small: subScores.small, medium: subScores.medium, large: subScores.large, ts: Date.now() });
+    if(record.attempts.length > 200) record.attempts = record.attempts.slice(-200);
+    record.bestScore = Math.max(record.bestScore||0, score);
+    record.avgScore = Math.round(record.attempts.reduce((a,b)=>a+b.score,0)/record.attempts.length);
+    const res = await safeSet(key, JSON.stringify(record), true);
+    return !!res;
+  }
+
+  async function getMyRecord(){
+    if(!currentPlayer) return null;
+    const res = await safeGet(`player:${slugify(currentPlayer)}`, true);
+    if(!res) return null;
+    try{ return JSON.parse(res.value); } catch(e){ return null; }
+  }
+
+  function openNameModal(isSwitch){
+    modalTitle.textContent = isSwitch ? "Switch player" : "Who's drawing?";
+    nameInput.value = '';
+    nameModal.style.display = 'flex';
+    setTimeout(()=>nameInput.focus(), 50);
+  }
+  function closeNameModal(){ nameModal.style.display = 'none'; }
+
+  async function setPlayer(name){
+    currentPlayer = name.trim().slice(0,30);
+    whoName.textContent = currentPlayer;
+    await safeSet('device-player-name', currentPlayer, false);
+    closeNameModal();
+    roundIndex = 0;
+    roundScores = {};
+    setupRoundUI();
+    refreshLeaderboard();
+    refreshStats();
+  }
+
+  nameSubmit.addEventListener('click', () => {
+    const v = nameInput.value.trim();
+    if(!v) { nameInput.focus(); return; }
+    setPlayer(v);
+  });
+  nameInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') nameSubmit.click(); });
+  switchBtn.addEventListener('click', () => openNameModal(true));
+
+  // ---------- Leaderboard ----------
+  async function refreshLeaderboard(){
+    leaderboardBody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading league standings…</td></tr>';
+    const list = await safeList('player:', true);
+    if(!list || !list.keys || list.keys.length === 0){
+      leaderboardBody.innerHTML = '';
+      lbEmpty.classList.remove('hidden');
+      return;
+    }
+    lbEmpty.classList.add('hidden');
+    const records = [];
+    for(const key of list.keys){
+      const res = await safeGet(key, true);
+      if(!res) continue;
+      try{ records.push(JSON.parse(res.value)); } catch(e){ /* skip corrupt record */ }
+    }
+    records.sort((a,b) => (b.bestScore||0) - (a.bestScore||0));
+    leaderboardBody.innerHTML = '';
+    records.forEach((rec, i) => {
+      const tr = document.createElement('tr');
+      const isMe = currentPlayer && slugify(rec.displayName) === slugify(currentPlayer);
+      if(isMe) tr.classList.add('me');
+      const rankClass = i===0 ? 'rank gold' : 'rank';
+      tr.innerHTML = `
+        <td class="${rankClass}">#${i+1}</td>
+        <td class="pname">${escapeHtml(rec.displayName)}${isMe ? ' (you)' : ''}</td>
+        <td class="num score-cell">${rec.bestScore||0}</td>
+        <td class="num">${rec.avgScore||0}</td>
+        <td class="num">${(rec.attempts||[]).length}</td>
+      `;
+      leaderboardBody.appendChild(tr);
+    });
+    if(records.length === 0) lbEmpty.classList.remove('hidden');
+  }
+
+  // ---------- Stats ----------
+  async function refreshStats(){
+    const rec = await getMyRecord();
+    if(!rec || !rec.attempts || rec.attempts.length === 0){
+      statBest.textContent = '–';
+      statAvg.textContent = '–';
+      statCount.textContent = '0';
+      statBars.innerHTML = '';
+      statsEmpty.classList.remove('hidden');
+      return;
+    }
+    statsEmpty.classList.add('hidden');
+    statBest.textContent = rec.bestScore;
+    statAvg.textContent = rec.avgScore;
+    statCount.textContent = rec.attempts.length;
+
+    const recent = rec.attempts.slice(-12);
+    const max = Math.max(...recent.map(a=>a.score), 1);
+    statBars.innerHTML = '';
+    recent.forEach(a => {
+      const bar = document.createElement('div');
+      bar.className = 'bar' + (a.score === rec.bestScore ? ' best' : '');
+      bar.style.height = Math.max(4, (a.score/max)*80) + 'px';
+      bar.innerHTML = `<span>${a.score}</span>`;
+      statBars.appendChild(bar);
+    });
+  }
+
+  // ---------- Tabs ----------
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(tabs).forEach(t=>t.classList.add('hidden'));
+      tabs[btn.dataset.tab].classList.remove('hidden');
+      if(btn.dataset.tab === 'leaderboard') refreshLeaderboard();
+      if(btn.dataset.tab === 'stats') refreshStats();
+      if(btn.dataset.tab === 'draw') sizeCanvas();
+    });
+  });
+
+  // ---------- Boot ----------
+  async function boot(){
+    setupRoundUI();
+    sizeCanvas();
+    const stored = await safeGet('device-player-name', false);
+    if(stored && stored.value){
+      currentPlayer = stored.value;
+      whoName.textContent = currentPlayer;
+      closeNameModal();
+      refreshLeaderboard();
+      refreshStats();
+    } else {
+      openNameModal(false);
+    }
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
